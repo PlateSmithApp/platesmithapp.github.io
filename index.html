@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlateSmith — Progressive overload, forged.</title>
+    <meta name="description" content="A strength-training logger with real progression tracking. Local-only. No subscription. $4.99 once.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #17140F;
+            --bg-card: #1E1B15;
+            --text: #E8E2D6;
+            --text-muted: #9A9385;
+            --accent: #C4A862;
+            --accent-dim: #8B7843;
+            --border: #2A261E;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 5rem 0 3rem;
+            text-align: center;
+        }
+
+        .hero-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: var(--bg-card);
+            border: 2px solid var(--accent-dim);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+        }
+
+        h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.4rem;
+        }
+
+        .tagline {
+            color: var(--accent);
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-description {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 540px;
+            margin: 0 auto 2rem;
+        }
+
+        .badge-row {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .badge-placeholder {
+            display: inline-block;
+            padding: 0.7rem 1.6rem;
+            border: 1px solid var(--accent-dim);
+            border-radius: 8px;
+            color: var(--accent);
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        .badge-placeholder:hover {
+            background: var(--bg-card);
+        }
+
+        .price-note {
+            margin-top: 1rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Sections */
+        section {
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        /* Features */
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 540px) {
+            .features { grid-template-columns: 1fr; }
+        }
+
+        .feature {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text);
+            margin-bottom: 0.4rem;
+        }
+
+        .feature-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 0;
+        }
+
+        /* Story */
+        .story p {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+        }
+
+        /* Free vs Pro */
+        .tiers {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 540px) {
+            .tiers { grid-template-columns: 1fr; }
+        }
+
+        .tier {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.4rem;
+        }
+
+        .tier.pro {
+            border-color: var(--accent-dim);
+        }
+
+        .tier-name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .tier-price {
+            color: var(--accent);
+            font-size: 0.9rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .tier-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tier-list li {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            padding: 0.25rem 0;
+            padding-left: 1.2rem;
+            position: relative;
+        }
+
+        .tier-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.65rem;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+        }
+
+        /* Links */
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        footer {
+            padding: 2.5rem 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--text-muted);
+        }
+
+        footer a:hover {
+            color: var(--accent);
+        }
+
+        .footer-links {
+            margin-bottom: 0.8rem;
+        }
+
+        .footer-links a {
+            margin: 0 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-icon">&#x2692;</div>
+        <h1>PlateSmith</h1>
+        <div class="tagline">Progressive overload, forged.</div>
+        <p class="hero-description">
+            A strength-training logger built for lifters who care about mesocycles, progression schemes, and honest tracking. Everything runs on your phone. No accounts, no cloud, no subscriptions.
+        </p>
+        <div class="badge-row">
+            <!-- Replace with actual Play Store badge when listing is live -->
+            <a href="#" class="badge-placeholder">Coming soon on Google Play</a>
+        </div>
+        <p class="price-note">$4.99 one-time unlock for analytics. The training logger is free forever.</p>
+    </div>
+
+    <!-- Features -->
+    <section>
+        <h2>What it does</h2>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-title">Three progression schemes</div>
+                <p class="feature-desc">DP for standard lifts, DDP where each set progresses independently, TP for heavy compounds gated on form quality. RPE veto across all schemes.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Cycles, not weeks</div>
+                <p class="feature-desc">Training blocks track complete program rotations, not calendar time. Miss a day? The cycle doesn't advance. Honest tracking.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Warmup automation</div>
+                <p class="feature-desc">Knows your bar weight, plate inventory, and equipment type. Different ramp curves for barbells, machines, and isolation work.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Whole session visible</div>
+                <p class="feature-desc">Not a wizard. See every exercise, every prescribed weight, before you touch the bar. Tap through sets between rest periods.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Everything local</div>
+                <p class="feature-desc">No accounts, no cloud, no data collection. Your training data lives on your phone in SQLite. Full JSON backup and restore, always free.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Built for the gym</div>
+                <p class="feature-desc">Rest timer with lock-screen notifications, voice alerts, and countdown pips. Pinned technique notes on every exercise. Speed of entry between sets.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Free vs Pro -->
+    <section>
+        <h2>Free vs Pro</h2>
+        <p>The entire training loop is free. The $4.99 one-time unlock adds the analytics observatory.</p>
+        <div class="tiers">
+            <div class="tier">
+                <div class="tier-name">Free</div>
+                <div class="tier-price">Forever</div>
+                <ul class="tier-list">
+                    <li>All three progression schemes (DP, DDP, TP)</li>
+                    <li>RPE gating across all schemes</li>
+                    <li>Training blocks with phases and cycles</li>
+                    <li>Multiple programs</li>
+                    <li>Warmup automation</li>
+                    <li>Rest timer with lock-screen controls</li>
+                    <li>Timed exercises (planks, carries)</li>
+                    <li>Full session history</li>
+                    <li>Backup and restore</li>
+                </ul>
+            </div>
+            <div class="tier pro">
+                <div class="tier-name">Pro</div>
+                <div class="tier-price">$4.99 once</div>
+                <ul class="tier-list">
+                    <li>e1RM trend charts</li>
+                    <li>Volume and tonnage tracking</li>
+                    <li>Technique overlay on load</li>
+                    <li>PR detection with toasts</li>
+                    <li>CSV / JSON chart export</li>
+                    <li>Custom warmup rules</li>
+                    <li>Block report summaries</li>
+                    <li>30-day free trial on install</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Story -->
+    <section class="story">
+        <h2>How it was made</h2>
+        <p>
+            PlateSmith was designed and specified by a lifter who trains with it daily. Every feature decision — the progression logic, the UI layout, the warmup curves — comes from years of training, not from a model.
+        </p>
+        <p>
+            The code was written by Claude, Anthropic's AI, directed like an art director directs a designer. The spec, the domain decisions, the gym testing — those are human. The implementation was directed, not generated.
+        </p>
+        <p>
+            The full <a href="https://platesmithapp.github.io/spec">feature specification</a> is published openly, including the complete navigation tree and domain model. If you want to build something similar, that document is enough to do it.
+        </p>
+    </section>
+
+</div>
+
+<footer>
+    <div class="container">
+        <div class="footer-links">
+            <a href="https://platesmithapp.github.io/privacy">Privacy Policy</a>
+            <a href="https://platesmithapp.github.io/spec">Full Spec</a>
+            <a href="mailto:platesmith.app@gmail.com">Contact</a>
+        </div>
+        <p>PlateSmith is made by Mert Kalfa.</p>
+    </div>
+</footer>
+
+</body>
+</html>

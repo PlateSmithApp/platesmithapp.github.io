@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlateSmith — Public Feature Specification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.7;
+            color: #2a2a2a;
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+            background: #fafafa;
+        }
+        h1 { font-size: 1.6rem; margin-bottom: 0.3rem; color: #17140F; }
+        h2 { font-size: 1.2rem; margin-top: 2.5rem; margin-bottom: 0.6rem; color: #17140F; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; }
+        h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.4rem; color: #333; }
+        p { margin-bottom: 1rem; }
+        a { color: #6B5B3E; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.7rem; text-align: left; }
+        th { background: #f0ede7; font-weight: 600; }
+        code { background: #f0ede7; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.88rem; }
+        pre { background: #f0ede7; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 1rem 0; }
+        pre code { background: none; padding: 0; }
+        hr { border: none; border-top: 1px solid #ddd; margin: 2rem 0; }
+        strong { color: #17140F; }
+        em { color: #555; }
+        ul, ol { margin: 0 0 1rem 1.5rem; }
+        li { margin-bottom: 0.3rem; }
+        .back { display: inline-block; margin-bottom: 1.5rem; color: #6B5B3E; font-size: 0.9rem; text-decoration: none; }
+        .back:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <a href="https://platesmithapp.github.io" class="back">&larr; Back to PlateSmith</a>
+<h1>PlateSmith — Public Feature Specification</h1>
+<p><strong>Version:</strong> 1.0 (launch) · <strong>Published:</strong> August 2026 · <strong>Author:</strong> Mert Kalfa</p>
+<p>This is the full feature specification for PlateSmith, published openly so that anyone interested — whether a developer, a lifter with access to AI coding tools, or just someone curious about how the app works — can see exactly what it does, how it's structured, and why each decision was made. If you want to build something similar, this is enough to do it.</p>
+<p>PlateSmith was designed by me and coded by Claude (Anthropic's AI). I did the spec, the domain decisions, the UI review, and the gym testing. Claude wrote every line of Dart. This document is the spec I gave it.</p>
+<hr />
+<h2>1. What it is</h2>
+<p>A strength-training logger for Android (Flutter/Dart), optimised for speed of entry between sets and honest progression tracking across training blocks. Local-only, offline-first, single user.</p>
+<p><strong>What it replaces:</strong> Strong, Hevy, Boostcamp — each of which misses at least one of: proper warmup automation, per-exercise progression schemes with form gating, pinned technique notes, and training-block analytics measured in cycles rather than calendar weeks.</p>
+<p><strong>What it is not:</strong> A social app, a coaching platform, a nutrition tracker, or a cardio logger. No accounts, no cloud, no subscriptions.</p>
+<hr />
+<h2>2. Domain model</h2>
+<pre><code>TrainingBlock ──&lt; BlockPhase &gt;── Program ──&lt; ProgramDay ──&lt; ProgramExercise
+                                                                │
+Exercise (library) ─────────────────────────────────────────────┘
+
+Session (a performed ProgramDay) ──&lt; SessionExercise ──&lt; SetEntry
+</code></pre>
+<p><strong>Exercise</strong> — A library entity (e.g., "Low-Bar Back Squat"). Owns: name, equipment type, bar weight, plate inventory, loading step, default increment, warmup rule, rest timer default, pinned note (technique cues), measurement metric (reps or time), muscle group. Follows the movement across programs.</p>
+<p><strong>Program</strong> — A named collection of up to 7 days (Day 1 … Day 7). Days form a rotating queue, not weekday-bound: you pick any day, and the app suggests the next unperformed one.</p>
+<p><strong>ProgramExercise</strong> — An exercise's slot inside a day: target set count, rep range, progression scheme, increment override, warmup rule override, target RPE, superset group.</p>
+<p><strong>TrainingBlock</strong> — An ordered sequence of phases, e.g., "6 cycles of Upper/Lower → 4 cycles of Full Body." Analytics roll up per block. Duration is measured in cycles, not calendar weeks.</p>
+<p><strong>Cycle</strong> — One full pass through a Program's days. The unit of block progress. A cycle advances only when every day is completed or explicitly skipped. Nothing auto-advances.</p>
+<p><strong>Session</strong> — An actual performed workout. Records: start/finish time, elapsed time, bodyweight, notes.</p>
+<p><strong>SetEntry</strong> — One set: type, weight, reps (or duration for timed exercises), RPE, technique flag, completion timestamp.</p>
+<h3>2.1 Cycles, not calendar weeks</h3>
+<p>Block progress is measured in cycles — one full rotation through the program's days — because training doesn't respect calendar boundaries. If you do Days 1–3 in one week and Day 4 the following Monday, that is still cycle 1.</p>
+<p>The header reads "Cycle 1 of 12." Never "week." Skipping is a first-class action: skipped days are recorded (status: skipped) so adherence stats stay honest and the cycle can close. Repeating a day within a cycle is allowed and does not advance the counter.</p>
+<h3>2.2 Set types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Visual</th>
+<th>Counts toward volume</th>
+<th>Drives progression</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>warmup</td>
+<td>grey / outlined</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>work</td>
+<td>accent / solid</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>dropset</td>
+<td>amber / indented</td>
+<td>Yes (flagged)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>backoff</td>
+<td>blue-grey</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>AMRAP</td>
+<td>accent + badge</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>Type is freely editable per set (tap the # cell to change). Sets can be inserted anywhere and reordered.</p>
+<h3>2.3 Timed exercises</h3>
+<p>Exercises can be measured by reps (default) or time. Timed exercises (planks, carries) log a duration in seconds instead of reps. The set table shows "0:45" instead of "8 reps." A dedicated set timer dialog handles the countdown with a 5-second lead-in, voice cues, and countdown pips.</p>
+<hr />
+<h2>3. The session screen — the core UI</h2>
+<p>The screen you look at for 60–90 minutes. Everything else is secondary.</p>
+<h3>3.1 Whole-session visibility (hard requirement)</h3>
+<p>Starting a day shows the entire session at once — every exercise, every planned set, every prescribed weight and rep target — not a wizard that reveals one exercise at a time. You should be able to see the whole workout before you touch the first bar, and scroll back to a finished exercise to add a set or fix a number.</p>
+<p>All exercise cards render in a single scrolling list, in program order. Cards are collapsible: the current exercise is expanded, completed ones auto-collapse to a one-line summary ("Squat · 3×6 @ 120 kg · RPE 8") but expand on tap.</p>
+<h3>3.2 Sticky session header</h3>
+<p>Pinned at the top: day name, set progress counter ("12/18 sets"), cycle info, elapsed workout timer, and an exercise progress bar showing completion at a glance.</p>
+<h3>3.3 Exercise card layout</h3>
+<pre><code>┌─────────────────────────────────────────────┐
+│ ⠿  Barbell Back Squat         ⏱ 2:30  [⋮] │  ← drag handle, rest timer pill, overflow
+│ 📌 Brace before unracking, knees out       │  ← pinned note (always shown)
+│ 🗒 Last session: &quot;felt heavy, sleep bad&quot;    │  ← last session's note (collapsible)
+│ 💡 TP: hit 5-8, all 👍 → +5 kg             │  ← prescription note from engine
+├─────────────────────────────────────────────┤
+│  #    kg      reps    RPE    form    ✓      │
+│  W    20.0     8       –      –      ✓      │  ← warmup (grey)
+│  W    60.0     5       –      –      ✓      │
+│  W    90.0     3       –      –      ✓      │
+│  1   120.0     6      8.0     👍     ✓      │  ← work set (accent)
+│  2   120.0     6      8.5     👍     ○      │
+│  3   120.0     –       –      –      ○      │  ← not yet completed
+│                                             │
+│  [timer]  [+ set]  [notes]  [history]       │  ← action row
+└─────────────────────────────────────────────┘
+</code></pre>
+<h3>3.4 Interactions</h3>
+<ul>
+<li><strong>Tap a cell</strong> → numeric editor tuned to the field. Weight: step buttons matching loading step + free entry, with plate math shown. Reps: integer stepper + chip row. RPE: 6.0–10.0 in 0.5 steps, chip-only (no free entry — deliberate constraint). Duration: seconds stepper + chip row.</li>
+<li><strong>Swipe right on a row</strong> → duplicate set below.</li>
+<li><strong>Swipe left on a row</strong> → delete set.</li>
+<li><strong>Tap # cell</strong> → set type picker (warmup / work / drop / backoff / AMRAP).</li>
+<li><strong>Tap form cell</strong> → cycles through: unset → good (👍) → needs work (👀) → unset.</li>
+<li><strong>Check ✓</strong> → marks set complete, auto-starts rest timer.</li>
+<li><strong>Drag handle</strong> → reorder exercises within the live session.</li>
+</ul>
+<h3>3.5 Pre-filling</h3>
+<p>Rows are pre-filled from the last session's performance of the same program exercise, including warmup rows and set count. A session with no changes is pure check-tapping.</p>
+<h3>3.6 Notes (three kinds)</h3>
+<ol>
+<li><strong>Pinned note</strong> — permanent, always visible, per-exercise. Technique cues. Lives on the Exercise entity.</li>
+<li><strong>Session note</strong> — free text for this session's performance. Previous session's note shown read-only beneath.</li>
+<li><strong>Session-level note</strong> — one per workout. Global context (sleep, stress, gym conditions).</li>
+</ol>
+<h3>3.7 Exercise settings (per-session or permanent)</h3>
+<p>Accessible from the overflow menu: progression scheme, increment, rep range, warmup rule, rest duration. Editing changes it for this session only by default, with a "save to program" option. A one-off tweak at the rack never silently rewrites your program.</p>
+<hr />
+<h2>4. Warmup engine</h2>
+<p>Warmups are suggested, never forced. Every generated row is editable and deletable. Manual warmups can be added on any exercise.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Applies to</th>
+<th>Ramp</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>barbell_heavy</td>
+<td>barbell compounds</td>
+<td>empty bar × 8, 50% × 5, 75% × 3</td>
+</tr>
+<tr>
+<td>compound_machine</td>
+<td>loaded machines (hack squat, leg press, pulldowns, rows)</td>
+<td>50% × 5, 75% × 3</td>
+</tr>
+<tr>
+<td>isolation</td>
+<td>flyes, curls, laterals, extensions</td>
+<td>single set at ~65% × 8</td>
+</tr>
+<tr>
+<td>none</td>
+<td>bodyweight, accessories</td>
+<td>—</td>
+</tr>
+<tr>
+<td>custom</td>
+<td>any</td>
+<td>user-defined list of (percent-or-absolute, reps) pairs</td>
+</tr>
+</tbody>
+</table>
+<p>Percentages are of the target work weight. Results are rounded to the nearest achievable loading given bar weight and plate inventory. If a warmup lands at or below bar weight, it collapses to the empty-bar row.</p>
+<p>Memory beats math: if last session had warmup rows, those are copied forward. "Regenerate warmups" recomputes from the rule.</p>
+<hr />
+<h2>5. Progression engine</h2>
+<p>Set per exercise (default: none). The app suggests the next session's prescription; you can always override, and an override becomes the new baseline.</p>
+<h3>none — no auto-progression</h3>
+<p>Last session's weights and reps carried forward as-is.</p>
+<h3>DP — double progression</h3>
+<p>Target: a rep range (e.g., 6–8) across N sets.
+All work sets hit the top of the range → next session: weight + increment, reps reset to bottom.
+Otherwise → same weight, try to add reps.</p>
+<h3>DDP — dynamic double progression</h3>
+<p>Same rep range, but sets progress independently. Set 1 hits the top of the range → set 1 gets +increment next time. Set 3 doesn't → set 3 stays. Sets are permanently allowed to run at different weights — they do not re-converge. The UI shows per-set targets.</p>
+<h3>TP — triple progression (form-gated)</h3>
+<p>Reserved for heavy technical lifts (squat, bench, deadlift). Same as DP, but a weight increase is only suggested when all work sets in the qualifying session were flagged 👍 (good form). If any set was flagged 👀, the app holds weight and explains why.</p>
+<h3>RPE gate (applies to all schemes)</h3>
+<p>If any qualifying work set was logged at RPE ≥ 9.5, the app holds weight and prescribes a repeat, even if the rep target was met. The card shows why. This composes with TP's form gate: a weight increase needs reps met AND all form good AND no RPE ≥ 9.5.</p>
+<h3>Increment rounding</h3>
+<p>An increment is never inflated by rounding. If you're at 47.5 kg on a 5 kg stack, +5 means +5, not +7.5. The engine rounds relative to your current weight's offset from the grid.</p>
+<hr />
+<h2>6. Timers</h2>
+<p><strong>Rest timer</strong> — Per-exercise default duration, editable inline, remembered across sessions. Auto-starts when a set is checked. Runs as a foreground service (survives locked screen). Fires notification + sound + vibration at zero, with +30s / −30s / skip actions on the notification. Countdown pips in the last 3 seconds. Optional voice alert ("Rest over" — customizable phrase).</p>
+<p><strong>Workout timer</strong> — Starts on session start, shown in the sticky header and ongoing notification. Elapsed time recorded per session.</p>
+<p><strong>Set timer</strong> — For timed exercises only. Modal dialog with a 5-second lead-in countdown, work countdown, voice cues ("Get ready" / "Go" / "Time"), and pips at 3/2/1. Can be stopped early.</p>
+<p><strong>Idle reminder</strong> — If no set has been logged for N minutes (configurable: off / 15 / 30 / 45 / 60), a notification nudges you back.</p>
+<hr />
+<h2>7. Analytics</h2>
+<p>All scoped by exercise, program, and training block:</p>
+<ul>
+<li><strong>e1RM</strong> — Estimated 1RM per work set. Primary formula: RPE-based using an RTS-style reps × RPE → %1RM chart. Fallback: Epley and Brzycki. Best e1RM per session plotted as a line chart.</li>
+<li><strong>Top-set weight</strong> — Line chart of heaviest work set per session.</li>
+<li><strong>Session volume</strong> — Bar chart (tonnage = Σ weight × reps).</li>
+<li><strong>PRs</strong> — Automatic detection: heaviest weight, best e1RM, best session volume. Toast notification when hit.</li>
+<li><strong>Block report</strong> — Per-exercise summary: starting e1RM → current, delta, session count.</li>
+</ul>
+<hr />
+<h2>8. Training blocks and programs</h2>
+<p><strong>Block lifecycle:</strong> Draft → Active → Completed/Cancelled. One block is active at a time.</p>
+<p><strong>Block editor:</strong> Ordered list of phases. Each phase = a program for N cycles. Add/remove phases, adjust cycle counts.</p>
+<p><strong>Program editor:</strong> Reorderable list of days. Each day has a reorderable list of exercise slots. Drag to reorder, swipe to remove, tap to edit slot settings (sets, rep range, progression, increment).</p>
+<p><strong>Program snapshots:</strong> When a block starts, it takes a private copy of its programs. Edits during a run don't touch the library template, and library edits don't affect running blocks.</p>
+<p><strong>Day selection:</strong> Shows all days in the active cycle with status (pending / completed / skipped) and staleness ("last done 5 days ago"). Tap to start, skip button to skip. Completing all days closes the cycle automatically.</p>
+<hr />
+<h2>9. Exercise library</h2>
+<p>Searchable list of all exercises. Each exercise has: name, equipment type, measurement metric (reps/time), bar weight, plate inventory, loading step, default increment, warmup rule, rest timer default, default progression scheme, pinned note, muscle group, archived flag.</p>
+<p>Create new exercises from the library or inline during a session (search for a name, create if not found).</p>
+<p>Archive instead of delete if the exercise has logged history — preserves analytics.</p>
+<hr />
+<h2>10. Session history</h2>
+<p>All recorded workouts in list or calendar view. Month separators, dots on calendar days. Tap for full detail: every exercise, every set, e1RM calculations, notes. Sessions can be edited (reopens in the session screen), dates changed, or deleted.</p>
+<p><strong>Backdating:</strong> "Log a past workout" lets you record a session for a previous date. Can be standalone (ad-hoc) or attached to a block's open cycle. The entire session screen works identically but stamps with the chosen date.</p>
+<hr />
+<h2>11. Backup and data portability</h2>
+<p>Full database backup as JSON. Auto-backup after every session. Manual backup on demand. Restore from file (validates schema, shows contents preview before overwriting). Export backup to Downloads folder.</p>
+<p>The backup format is flat: every database table dumped as an array of row objects. Schema version is included so restores survive app updates — new columns land with defaults, unknown columns are stripped. A backup from any version restores into any other version.</p>
+<p><strong>Backups are always free, even in the free tier.</strong> Your data is never held hostage.</p>
+<hr />
+<h2>12. App navigation tree</h2>
+<pre><code>Home Screen
+├── Resume Card → Session Screen (resume paused workout)
+├── Active Block Card → Day Select Screen
+├── Ad-Hoc Card → Exercise Picker → Session Screen
+├── Recent Workouts → Session History
+│
+├── [Drawer Menu]
+│   ├── Training Blocks → Block Library
+│   │   ├── Create Block → Block Editor
+│   │   │   └── Add Phase → Program Picker + Cycle Count
+│   │   ├── Block Report (analytics summary)
+│   │   └── Run / Finish / Cancel block
+│   │
+│   ├── Programs → Program Library
+│   │   ├── Create Program → Program Editor
+│   │   │   ├── Add/Reorder Days
+│   │   │   └── Add/Edit Exercise Slots
+│   │   │       └── Slot Editor (sets, reps, progression, increment)
+│   │   └── Duplicate / Delete program
+│   │
+│   ├── Exercise Library
+│   │   ├── Create Exercise → Exercise Editor
+│   │   │   └── Full form: name, equipment, metric, warmup, rest, notes
+│   │   └── Exercise Progress Screen (charts)
+│   │
+│   ├── Workout History → Session History
+│   │   ├── List view / Calendar view
+│   │   ├── Session Detail (bottom sheet)
+│   │   ├── Edit session → Session Screen (reopen)
+│   │   └── Log Past Workout → Date Picker → Session Screen (backdated)
+│   │
+│   ├── Settings
+│   │   ├── Bar weight (15/20/25 kg)
+│   │   ├── Plate inventory (available pairs)
+│   │   ├── e1RM formula (RPE / Epley / Brzycki)
+│   │   ├── Alerts (pips, voice, idle reminder)
+│   │   └── Backups &amp; Restore
+│   │       ├── Auto + manual backup list
+│   │       └── Restore from file
+│   │
+│   └── About (static info page)
+│
+└── Day Select Screen
+    ├── Tap pending day → Session Screen
+    ├── Tap completed day → &quot;One-off&quot; → Session Screen (no block advancement)
+    └── Skip day → marks skipped, may close cycle
+
+Session Screen (the live workout)
+├── Sticky Header (day, progress, timer)
+├── Exercise Cards (reorderable, collapsible)
+│   ├── Set Table (swipe to duplicate/delete)
+│   │   └── Cell editors: weight, reps/duration, RPE, set type, form flag
+│   ├── Notes Sheet (pinned + session + last session)
+│   ├── History Sheet → Exercise Progress Screen
+│   ├── Settings Sheet (progression, warmup, rest, swap, remove)
+│   └── Rest Timer Sheet (live countdown, +30s/-30s/skip)
+├── Add Exercise → Exercise Picker (search + create)
+└── Finish → Confirm Dialog → auto-backup → return to previous screen
+</code></pre>
+<hr />
+<h2>13. Technical decisions (for anyone building their own)</h2>
+<ul>
+<li><strong>Framework:</strong> Flutter (Dart). Android first, iOS later for ~10% extra work.</li>
+<li><strong>Storage:</strong> Local SQLite (sqflite, hand-written SQL). No ORM code generation.</li>
+<li><strong>State:</strong> ChangeNotifier + InheritedWidget. No state management package.</li>
+<li><strong>Charts:</strong> fl_chart.</li>
+<li><strong>Architecture:</strong> domain layer is pure Dart with no Flutter imports — fully unit-testable. Warmup, progression, plate-rounding, and e1RM logic live here and get tests first.</li>
+<li><strong>Models:</strong> Plain immutable Dart classes. No code generation (no freezed, no build_runner).</li>
+<li><strong>Timers:</strong> Android foreground service with ongoing notification. Wall-clock based (timestamps, not ticks) so elapsed time is correct even if the process is suspended.</li>
+<li><strong>Session state:</strong> Written to SQLite on every change. A hard kill loses at most the current keystroke.</li>
+</ul>
+<hr />
+<h2>14. Plate math</h2>
+<p>Given target weight T, bar weight B, and available plate pairs P: compute per-side loading = (T − B) / 2, greedily fill from largest plate. Default inventory: [25, 20, 15, 10, 5, 2.5, 1.25] → 2.5 kg resolution on a barbell. The UI shows the loading ("2×20 + 1×10 + 1×2.5 per side") under the weight cell for work sets.</p>
+<hr />
+<h2>15. RPE chart</h2>
+<p>Standard RTS-style chart mapping reps × RPE → %1RM, covering reps 1–12 and RPE 6.0–10.0 in 0.5 steps. Anchors: 1 rep @ RPE 10 = 100%, 5 reps @ RPE 8 = 81%, 8 reps @ RPE 8 = 71.5%.</p>
+<p>e1RM = weight / pct(reps, RPE). When RPE is missing, fall back to Epley: w × (1 + reps/30).</p>
+<hr />
+<p><em>Published under the principle that the value of an app is in the execution and the daily use, not in keeping the spec secret. If this helps you build something for your own training, good.</em></p>
+    <hr>
+    <p style="font-size: 0.85rem; color: #888; margin-top: 2rem;">PlateSmith is made by Mert Kalfa. <a href="https://platesmithapp.github.io/privacy">Privacy Policy</a> &middot; <a href="mailto:platesmith.app@gmail.com">Contact</a></p>
+</body>
+</html>
