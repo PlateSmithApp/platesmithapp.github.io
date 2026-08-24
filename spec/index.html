@@ -38,7 +38,7 @@
 <body>
     <a href="https://platesmithapp.github.io" class="back">&larr; Back to PlateSmith</a>
 <h1>PlateSmith — Public Feature Specification</h1>
-<p><strong>Version:</strong> 1.0 (launch) · <strong>Published:</strong> August 2026 · <strong>Author:</strong> Mert Kalfa</p>
+<p><strong>Version:</strong> 1.1 (launch) · <strong>Published:</strong> August 2026 · <strong>Author:</strong> Mert Kalfa</p>
 <p>This is the full feature specification for PlateSmith, published openly so that anyone interested — whether a developer, a lifter with access to AI coding tools, or just someone curious about how the app works — can see exactly what it does, how it's structured, and why each decision was made. If you want to build something similar, this is enough to do it.</p>
 <p>PlateSmith was designed by me and coded by Claude (Anthropic's AI). I did the spec, the domain decisions, the UI review, and the gym testing. Claude wrote every line of Dart. This document is the spec I gave it.</p>
 <hr />
@@ -54,12 +54,12 @@ Exercise (library) ────────────────────�
 
 Session (a performed ProgramDay) ──&lt; SessionExercise ──&lt; SetEntry
 </code></pre>
-<p><strong>Exercise</strong> — A library entity (e.g., "Low-Bar Back Squat"). Owns: name, equipment type, bar weight, plate inventory, loading step, default increment, warmup rule, rest timer default, pinned note (technique cues), measurement metric (reps or time), muscle group. Follows the movement across programs.</p>
+<p><strong>Exercise</strong> — A library entity (e.g., "Low-Bar Back Squat"). Owns: name, equipment type, per-exercise bar weight, display unit (kg or lb), plate inventory, loading step, default increment, warmup rule, rest timer default, pinned note (technique cues), measurement metric (reps or time), muscle group (chest / back / shoulders / arms / legs / core, or uncategorized). Follows the movement across programs.</p>
 <p><strong>Program</strong> — A named collection of up to 7 days (Day 1 … Day 7). Days form a rotating queue, not weekday-bound: you pick any day, and the app suggests the next unperformed one.</p>
-<p><strong>ProgramExercise</strong> — An exercise's slot inside a day: target set count, rep range, progression scheme, increment override, warmup rule override, target RPE, superset group.</p>
+<p><strong>ProgramExercise</strong> — An exercise's slot inside a day: target set count, rep range, progression scheme, increment override, warmup rule override, target RPE.</p>
 <p><strong>TrainingBlock</strong> — An ordered sequence of phases, e.g., "6 cycles of Upper/Lower → 4 cycles of Full Body." Analytics roll up per block. Duration is measured in cycles, not calendar weeks.</p>
 <p><strong>Cycle</strong> — One full pass through a Program's days. The unit of block progress. A cycle advances only when every day is completed or explicitly skipped. Nothing auto-advances.</p>
-<p><strong>Session</strong> — An actual performed workout. Records: start/finish time, elapsed time, bodyweight, notes.</p>
+<p><strong>Session</strong> — An actual performed workout. Records: start/finish time, elapsed time, bodyweight (optional, prompted at finish), notes.</p>
 <p><strong>SetEntry</strong> — One set: type, weight, reps (or duration for timed exercises), RPE, technique flag, completion timestamp.</p>
 <h3>2.1 Cycles, not calendar weeks</h3>
 <p>Block progress is measured in cycles — one full rotation through the program's days — because training doesn't respect calendar boundaries. If you do Days 1–3 in one week and Day 4 the following Monday, that is still cycle 1.</p>
@@ -188,14 +188,9 @@ Session (a performed ProgramDay) ──&lt; SessionExercise ──&lt; SetEntry
 <td>bodyweight, accessories</td>
 <td>—</td>
 </tr>
-<tr>
-<td>custom</td>
-<td>any</td>
-<td>user-defined list of (percent-or-absolute, reps) pairs</td>
-</tr>
 </tbody>
 </table>
-<p>Percentages are of the target work weight. Results are rounded to the nearest achievable loading given bar weight and plate inventory. If a warmup lands at or below bar weight, it collapses to the empty-bar row.</p>
+<p>Percentages are of the target work weight. Results are rounded to the nearest achievable loading given bar weight and plate inventory. If a warmup lands at or below bar weight, it collapses to the empty-bar row. (Plate-math preview shows for kg-mode barbells; it hides when the exercise is displayed in lb.)</p>
 <p>Memory beats math: if last session had warmup rows, those are copied forward. "Regenerate warmups" recomputes from the rule.</p>
 <hr />
 <h2>5. Progression engine</h2>
@@ -216,20 +211,34 @@ Otherwise → same weight, try to add reps.</p>
 <p>An increment is never inflated by rounding. If you're at 47.5 kg on a 5 kg stack, +5 means +5, not +7.5. The engine rounds relative to your current weight's offset from the grid.</p>
 <hr />
 <h2>6. Timers</h2>
-<p><strong>Rest timer</strong> — Per-exercise default duration, editable inline, remembered across sessions. Auto-starts when a set is checked. Runs as a foreground service (survives locked screen). Fires notification + sound + vibration at zero, with +30s / −30s / skip actions on the notification. Countdown pips in the last 3 seconds. Optional voice alert ("Rest over" — customizable phrase).</p>
+<p><strong>Rest timer</strong> — Per-exercise default duration, editable inline, remembered across sessions. Auto-starts when a set is checked. Presented as an ongoing lock-screen notification with a live OS-rendered countdown that survives a locked screen and even process death; +30s and skip actions live on the notification. An exact-alarm fires a sound at zero from a locked phone. While the app is foregrounded, in-app countdown pips (last 3 seconds) and an optional voice alert ("Rest over" — customizable phrase) take over; the handoff between the two is automatic on lifecycle changes.</p>
 <p><strong>Workout timer</strong> — Starts on session start, shown in the sticky header and ongoing notification. Elapsed time recorded per session.</p>
 <p><strong>Set timer</strong> — For timed exercises only. Modal dialog with a 5-second lead-in countdown, work countdown, voice cues ("Get ready" / "Go" / "Time"), and pips at 3/2/1. Can be stopped early.</p>
 <p><strong>Idle reminder</strong> — If no set has been logged for N minutes (configurable: off / 15 / 30 / 45 / 60), a notification nudges you back.</p>
 <hr />
 <h2>7. Analytics</h2>
-<p>All scoped by exercise, program, and training block:</p>
+<p>Two homes: the <strong>per-exercise progress screen</strong> (long-press an exercise) and the <strong>Analytics hub</strong> (drawer → Analytics). PR <em>detection</em> runs for everyone and writes PR rows; the analytics screens and the PR celebration are the paid "observatory." Bodyweight is free.</p>
+<p>Per-exercise progress screen:</p>
 <ul>
 <li><strong>e1RM</strong> — Estimated 1RM per work set. Primary formula: RPE-based using an RTS-style reps × RPE → %1RM chart. Fallback: Epley and Brzycki. Best e1RM per session plotted as a line chart.</li>
+<li><strong>Technique overlay</strong> — Sessions that contained a form-flagged ("needs work") set are ringed on the e1RM line, so you can see whether form kept up with the load.</li>
+<li><strong>RPE-vs-load scatter</strong> — Every work set plotted as load × RPE, shaded by recency.</li>
 <li><strong>Top-set weight</strong> — Line chart of heaviest work set per session.</li>
 <li><strong>Session volume</strong> — Bar chart (tonnage = Σ weight × reps).</li>
-<li><strong>PRs</strong> — Automatic detection: heaviest weight, best e1RM, best session volume. Toast notification when hit.</li>
+<li><strong>CSV export</strong> — The chart's underlying data exported to Downloads.</li>
+</ul>
+<p>Analytics hub:</p>
+<ul>
+<li><strong>Bodyweight trend</strong> <em>(free)</em> — Line chart from the optional weigh-in prompted at session finish.</li>
+<li><strong>Muscle-group volume</strong> — Tonnage/hard-set volume grouped by muscle (chest / back / shoulders / arms / legs / core), filterable 30 days / 90 days / all time. Re-categorizing an exercise retroactively corrects past charts; uncategorized exercises are never silently mis-filed.</li>
+<li><strong>Block-to-block comparison</strong> — Pick two blocks; see sessions, calendar span, tonnage, hard sets, and the e1RM change on the lifts they share.</li>
+</ul>
+<p>Cross-cutting:</p>
+<ul>
+<li><strong>PRs</strong> — Automatic detection at every finish: heaviest weight and best e1RM per exercise, against all prior finished sessions. A PR triggers a celebration dialog (labels respect the exercise's kg/lb unit).</li>
 <li><strong>Block report</strong> — Per-exercise summary: starting e1RM → current, delta, session count.</li>
 </ul>
+<p><em>Coming in a future update: Garmin FIT export.</em></p>
 <hr />
 <h2>8. Training blocks and programs</h2>
 <p><strong>Block lifecycle:</strong> Draft → Active → Completed/Cancelled. One block is active at a time.</p>
@@ -239,7 +248,7 @@ Otherwise → same weight, try to add reps.</p>
 <p><strong>Day selection:</strong> Shows all days in the active cycle with status (pending / completed / skipped) and staleness ("last done 5 days ago"). Tap to start, skip button to skip. Completing all days closes the cycle automatically.</p>
 <hr />
 <h2>9. Exercise library</h2>
-<p>Searchable list of all exercises. Each exercise has: name, equipment type, measurement metric (reps/time), bar weight, plate inventory, loading step, default increment, warmup rule, rest timer default, default progression scheme, pinned note, muscle group, archived flag.</p>
+<p>Searchable list of all exercises. Each exercise has: name, equipment type, measurement metric (reps/time), display unit (kg/lb), per-exercise bar weight, plate inventory, loading step, default increment, warmup rule, rest timer default, default progression scheme, pinned note, muscle group, archived flag.</p>
 <p>Create new exercises from the library or inline during a session (search for a name, create if not found).</p>
 <p>Archive instead of delete if the exercise has logged history — preserves analytics.</p>
 <hr />
@@ -275,8 +284,13 @@ Otherwise → same weight, try to add reps.</p>
 │   │
 │   ├── Exercise Library
 │   │   ├── Create Exercise → Exercise Editor
-│   │   │   └── Full form: name, equipment, metric, warmup, rest, notes
-│   │   └── Exercise Progress Screen (charts)
+│   │   │   └── Full form: name, equipment, metric, unit (kg/lb), bar weight, warmup, rest, muscle group, notes
+│   │   └── Exercise Progress Screen (e1RM + technique overlay, RPE scatter, top set, volume, CSV export)
+│   │
+│   ├── Analytics (hub)
+│   │   ├── Bodyweight trend (free)
+│   │   ├── Muscle-group volume (30d / 90d / all)
+│   │   └── Block-to-block comparison
 │   │
 │   ├── Workout History → Session History
 │   │   ├── List view / Calendar view
@@ -285,7 +299,7 @@ Otherwise → same weight, try to add reps.</p>
 │   │   └── Log Past Workout → Date Picker → Session Screen (backdated)
 │   │
 │   ├── Settings
-│   │   ├── Bar weight (15/20/25 kg)
+│   │   ├── Gym default bar weight (15/20/25 kg; per-exercise override incl. 35/45 lb / custom)
 │   │   ├── Plate inventory (available pairs)
 │   │   ├── e1RM formula (RPE / Epley / Brzycki)
 │   │   ├── Alerts (pips, voice, idle reminder)
@@ -321,7 +335,7 @@ Session Screen (the live workout)
 <li><strong>Charts:</strong> fl_chart.</li>
 <li><strong>Architecture:</strong> domain layer is pure Dart with no Flutter imports — fully unit-testable. Warmup, progression, plate-rounding, and e1RM logic live here and get tests first.</li>
 <li><strong>Models:</strong> Plain immutable Dart classes. No code generation (no freezed, no build_runner).</li>
-<li><strong>Timers:</strong> Android foreground service with ongoing notification. Wall-clock based (timestamps, not ticks) so elapsed time is correct even if the process is suspended.</li>
+<li><strong>Timers:</strong> Ongoing Android notification with an OS-rendered chronometer plus exact-alarm for the end-of-rest sound; wall-clock based (timestamps, not ticks) so elapsed time is correct even if the process is suspended or killed. Notification actions run in a background isolate.</li>
 <li><strong>Session state:</strong> Written to SQLite on every change. A hard kill loses at most the current keystroke.</li>
 </ul>
 <hr />
@@ -333,7 +347,5 @@ Session Screen (the live workout)
 <p>e1RM = weight / pct(reps, RPE). When RPE is missing, fall back to Epley: w × (1 + reps/30).</p>
 <hr />
 <p><em>Published under the principle that the value of an app is in the execution and the daily use, not in keeping the spec secret. If this helps you build something for your own training, good.</em></p>
-    <hr>
-    <p style="font-size: 0.85rem; color: #888; margin-top: 2rem;">PlateSmith is made by Mert Kalfa. <a href="https://platesmithapp.github.io/privacy">Privacy Policy</a> &middot; <a href="mailto:platesmith.app@gmail.com">Contact</a></p>
 </body>
 </html>
