@@ -54,7 +54,7 @@ Exercise (library) ────────────────────�
 
 Session (a performed ProgramDay) ──&lt; SessionExercise ──&lt; SetEntry
 </code></pre>
-<p><strong>Exercise</strong> — A library entity (e.g., "Low-Bar Back Squat"). Owns: name, equipment type, per-exercise bar weight, display unit (kg or lb), plate inventory, loading step, default increment, warmup rule, rest timer default, pinned note (technique cues), measurement metric (reps or time), muscle group (chest / back / shoulders / arms / legs / core, or uncategorized). Follows the movement across programs.</p>
+<p><strong>Exercise</strong> — A library entity (e.g., "Low-Bar Back Squat"). Owns: name, equipment type (barbell / dumbbell / machine / cable / bodyweight / assisted / other), per-exercise bar weight, display unit (kg or lb), plate inventory, loading step, default increment, warmup rule, rest timer default, pinned note (technique cues), measurement metric (reps or time), muscle groups — any combination of chest / back / shoulders / arms / biceps / triceps / legs / quads / hamstrings / glutes / calves / tibs / core, or uncategorized (a deadlift can be back + hamstrings + glutes; coarse and fine can coexist). Follows the movement across programs.</p>
 <p><strong>Program</strong> — A named collection of up to 7 days (Day 1 … Day 7). Days form a rotating queue, not weekday-bound: you pick any day, and the app suggests the next unperformed one.</p>
 <p><strong>ProgramExercise</strong> — An exercise's slot inside a day: target set count, rep range, progression scheme, increment override, warmup rule override, target RPE.</p>
 <p><strong>TrainingBlock</strong> — An ordered sequence of phases, e.g., "6 cycles of Upper/Lower → 4 cycles of Full Body." Analytics roll up per block. Duration is measured in cycles, not calendar weeks.</p>
@@ -203,10 +203,12 @@ All work sets hit the top of the range → next session: weight + increment, rep
 Otherwise → same weight, try to add reps.</p>
 <h3>DDP — dynamic double progression</h3>
 <p>Same rep range, but sets progress independently. Set 1 hits the top of the range → set 1 gets +increment next time. Set 3 doesn't → set 3 stays. Sets are permanently allowed to run at different weights — they do not re-converge. The UI shows per-set targets.</p>
-<h3>TP — triple progression (form-gated)</h3>
-<p>Reserved for heavy technical lifts (squat, bench, deadlift). Same as DP, but a weight increase is only suggested when all work sets in the qualifying session were flagged 👍 (good form). If any set was flagged 👀, the app holds weight and explains why.</p>
+<h3>TP — top-set progression (form-gated, per set)</h3>
+<p>Reserved for heavy technical lifts (squat, bench, deadlift). Each set progresses independently, like DDP — a set that hits the top of the range gets +increment next time — but every advance is additionally gated on THAT set's form flag. A set flagged 👀 holds even if its reps were there; the other sets are unaffected. Your top set is never held hostage by the back-offs.</p>
 <h3>RPE gate (applies to all schemes)</h3>
-<p>If any qualifying work set was logged at RPE ≥ 9.5, the app holds weight and prescribes a repeat, even if the rep target was met. The card shows why. This composes with TP's form gate: a weight increase needs reps met AND all form good AND no RPE ≥ 9.5.</p>
+<p>A set logged at RPE ≥ 9.5 blocks a weight increase that was otherwise earned. In DP it holds the whole exercise (DP judges the exercise as a whole); in TP and DDP it holds only the vetoed set. A veto on a set that missed the rep target anyway changes nothing and is not mentioned — the note only ever explains a decision it actually made.</p>
+<h3>Assisted exercises</h3>
+<p>For machine-assisted pull-ups, dips and the like, the logged weight is the machine's assistance, not added load. Progression runs identically to the exercise's scheme, except that a met target LOWERS the assistance by the increment (floored at zero — unassisted). PRs are "least assistance"; e1RM, tonnage and RPE-vs-e1RM charts exclude assisted work, since assistance × reps is not volume. Deliberately not linked to bodyweight.</p>
 <h3>Increment rounding</h3>
 <p>An increment is never inflated by rounding. If you're at 47.5 kg on a 5 kg stack, +5 means +5, not +7.5. The engine rounds relative to your current weight's offset from the grid.</p>
 <hr />
@@ -224,6 +226,7 @@ Otherwise → same weight, try to add reps.</p>
 <li><strong>Technique overlay</strong> — Sessions that contained a form-flagged ("needs work") set are ringed on the e1RM line, so you can see whether form kept up with the load.</li>
 <li><strong>RPE-vs-load scatter</strong> — Every work set plotted as load × RPE, shaded by recency.</li>
 <li><strong>Top-set weight</strong> — Line chart of heaviest work set per session.</li>
+<li><strong>Consistency</strong> (Pro, Analytics hub) — 13-week training heatmap, sessions per week (4-week average), week streak (consecutive weeks with at least one session; an empty current week is grace, not a break), longest gap between sessions, and the block-native pair: <strong>plan adherence</strong> (completed vs skipped cycle days in the active block) and <strong>plan streak</strong> (consecutive completed cycles with nothing skipped).</li>
 <li><strong>Session volume</strong> — Bar chart (tonnage = Σ weight × reps).</li>
 <li><strong>CSV export</strong> — The chart's underlying data exported to Downloads.</li>
 </ul>
